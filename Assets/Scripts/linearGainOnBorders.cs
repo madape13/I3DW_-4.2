@@ -6,12 +6,6 @@ public class linearGainOnBorders : MonoBehaviour {
     [Tooltip("Place the Steam CameraRig here!")]
     public GameObject steamCameraRig;
 
-    [Tooltip("Place the parent of world objects here!")]
-    public GameObject worldObjects;
-
-    [Tooltip("Place an object here, for highlight coloring!")]
-    public GameObject floor;
-
     [Tooltip("This value sets the gain in the outer rim ;)")]
     [Range(0.5f, 3.0f)]
     public float gain = 2.0f;
@@ -22,17 +16,21 @@ public class linearGainOnBorders : MonoBehaviour {
     
     protected float playAreaX;
     protected float playAreaY;
-    private int verbose = 0;
 
     protected float subAreaXmin = 0.0f;  // die max-Werte sind einfach min + grenzWert*2
     protected float subAreaYmin = 0.0f;
 
-    // Use this for initialization
+    protected float dimX = 2.0f;
+    protected float dimY = 2.0f;
+
+    private Material highlight;
+    public Color color;
+
     void Start () {
+        highlight = this.GetComponent<Renderer>().material;
 		if (steamCameraRig == null) {
             Debug.LogError("Missing Steam CameraRig as Object");            
         } else {
-            //     StartCoroutine(getPlayAreaDelayed());
             StartCoroutine(getPlayArea());        
         }
        
@@ -44,7 +42,7 @@ public class linearGainOnBorders : MonoBehaviour {
             yield return new WaitForSeconds(1f);
 
         Vector3 newScale = new Vector3(Mathf.Abs(rect.vCorners0.v0 - rect.vCorners2.v0), this.transform.localScale.y, Mathf.Abs(rect.vCorners0.v2 - rect.vCorners2.v2));
-        if (verbose > 0) {
+        if (false) {
             Debug.Log("Quad Ecke0 x:" + rect.vCorners0.v0 + " y: " + rect.vCorners0.v1 + " z: " + rect.vCorners0.v2);
             Debug.Log("Quad Ecke1 x:" + rect.vCorners1.v0 + " y: " + rect.vCorners1.v1 + " z: " + rect.vCorners1.v2);
             Debug.Log("Quad Ecke2 x:" + rect.vCorners2.v0 + " y: " + rect.vCorners2.v1 + " z: " + rect.vCorners2.v2);
@@ -53,7 +51,6 @@ public class linearGainOnBorders : MonoBehaviour {
         }
         playAreaX = newScale.x;
         playAreaY = newScale.z;
-        // this.transform.localScale = newScale;
     }
 
     /// Getrennte Gain-Bestimmung für die einzelnen Achsen:
@@ -69,27 +66,13 @@ public class linearGainOnBorders : MonoBehaviour {
         return false;
     }
 
-    /// Update is called once per frame
     void Update () {
         /// Important: This only works if the head is component 3 of SteamCamRig (default!)
         Vector3 playerPos = steamCameraRig.transform.GetChild(2).transform.localPosition;
-        Material mat = floor.GetComponent<Renderer>().material;
-        setNewPositionBoxedGain(playerPos, mat);
-        myMesh(subAreaXmin+steamCameraRig.transform.position.x, subAreaYmin+ steamCameraRig.transform.position.z);
 
-        /*
-        float x = playerPos.x;
-        float y = playerPos.z;        
-        if (isPlayerInGainAreaX(playerPos) || isPlayerInGainAreaY(playerPos)) {
-            setNewPosition(playerPos);
-            mat.color = Color.red;
-            if (verbose > 0)
-                Debug.Log("Gain on! X: " + x + "  Y: " + y);
-            } else {
-                mat.color =  Color.white;
-            }
-        }
-        */
+        setNewPositionBoxedGain(playerPos);
+        myMesh(subAreaXmin+steamCameraRig.transform.position.x, subAreaYmin+ steamCameraRig.transform.position.z, dimX, dimY);
+        highlight.color = this.color;
     }
 
     void setSubArea(float grenzWertX, float grenzWertY, Vector3 playerPos) {
@@ -97,49 +80,7 @@ public class linearGainOnBorders : MonoBehaviour {
         subAreaYmin = playerPos.z - grenzWertY;
     }
 
-
-    void setNewPosition(Vector3 playerPos) {
-        /// Version 0:
-        /// Permanent Gain: the position of the player moves the playArea
-        /// with him, resulting in a doubled playArea
-        // steamCameraRig.transform.position = new Vector3(playerPos.x, 0f, playerPos.z);
-        /// Works.
-
-        /// Version 1:
-        /// Now adapt to a shift only at the borders:
-        float grenzWertX = (playAreaX / 2.0f) *(1.0f - percentageOfArea);
-        float grenzWertY = (playAreaY / 2.0f) *(1.0f - percentageOfArea);
-        float shiftX = steamCameraRig.transform.position.x;
-        float shiftY = steamCameraRig.transform.position.z;
- 
-        if (isPlayerInGainAreaX(playerPos))
-            shiftX = Mathf.Sign(playerPos.x) * (Mathf.Abs(playerPos.x) - grenzWertX) * gain;
-        if (isPlayerInGainAreaY(playerPos))
-            shiftY = Mathf.Sign(playerPos.z) * (Mathf.Abs(playerPos.z) - grenzWertY) * gain;
-        steamCameraRig.transform.position = new Vector3(shiftX, 0f, shiftY);  
-        /// Works, Problem: always in "Gain Zone" at front and back
-        /// good sets: gain: 2.5, perc: 0.25 or gain: 2, perc: 0.3
-
-        /// Version 2:
-        //shiftX = playerPos.x * gain / 2.0f;
-        //shiftY = playerPos.z * gain / 2.0f;
-        //steamCameraRig.transform.position = new Vector3(shiftX, 0f, shiftY);
-        /// Problem: Jumps when the users reaches an oposing border.
-        /// I.E. Gain was applied left (shiftX = -1.1), then the user reaches
-        /// positive border: shiftX jumps to +1.1 instead of adjusting the shift
-
-        /// Version 3:
-        /* if (isPlayerInGainAreaX(playerPos))
-            shiftX += Mathf.Sign(playerPos.x) * (Mathf.Abs(playerPos.x) - grenzWertX) * gain;
-        if (isPlayerInGainAreaY(playerPos))
-            shiftY += Mathf.Sign(playerPos.z) * (Mathf.Abs(playerPos.z) - grenzWertY) * gain;
-        steamCameraRig.transform.position = new Vector3(shiftX, 0f, shiftY);
-        */
-        /// Problem: this is a "Switch-Shift"-Movement, as soon as one reaches
-        /// the border the playArea starts moving (indefinitly)      
-    }
-
-    void setNewPositionBoxedGain(Vector3 playerPos, Material mat) {
+    void setNewPositionBoxedGain(Vector3 playerPos) {
         float grenzWertX = (playAreaX / 2.0f) * (1.0f - percentageOfArea);
         float grenzWertY = (playAreaY / 2.0f) * (1.0f - percentageOfArea);
         float shiftX = 0.0f;
@@ -179,37 +120,21 @@ public class linearGainOnBorders : MonoBehaviour {
 
         // Darstellung und shift Schluss:
         if (isInGain) {
-            mat.color = Color.red;
             // subArea verschieben
             subAreaXmin += shiftX;
             subAreaYmin += shiftY;
-/*            if (shiftX > 0)
-                Debug.Log("sX: " + shiftX + " sY: " + shiftY + "  pPX: " + playerPos.x + "  pPY: " + playerPos.z);
-            else
-                Debug.Log("BREAK! SX: " + shiftX); */
-         // playArea verschieben
          // Gain:
             shiftX *= gain;
             shiftY *= gain;
             shiftX += steamCameraRig.transform.position.x;
             shiftY += steamCameraRig.transform.position.z;
-            steamCameraRig.transform.position = new Vector3(shiftX, 0f, shiftY);            
-            //shiftX -= worldObjects.transform.position.x;
-            //shiftY -= worldObjects.transform.position.z;
-            //worldObjects.transform.position = new Vector3(shiftX, 0f, shiftY);            
+            steamCameraRig.transform.position = new Vector3(shiftX, 0f, shiftY);                    
         }
-        else {
-            mat.color = Color.white;
-        }
-
     }
 
    
 
- void myMesh(float posX, float posY) {
-        /// Ziemlich hingehackt:
-        float dimX = 2.0f;
-        float dimY = 2.0f;
+ void myMesh(float posX, float posY, float dimX, float dimY) {
 
         MeshFilter mf = GetComponent<MeshFilter>();
         var mesh = new Mesh();
