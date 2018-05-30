@@ -24,6 +24,7 @@ public class linearGainOnBorders : MonoBehaviour {
     protected float dimY = 2.0f;
 
     private Material highlight;
+    [Tooltip("This color sets the highlight color")]
     public Color color;
 
     void Start () {
